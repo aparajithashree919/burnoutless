@@ -33,7 +33,7 @@ This project uses **Microsoft Foundry IQ** as its intelligence layer — connect
 ## Setup
 
 ```bash
-git clone https://github.com/your-username/burnoutless
+git clone https://github.com/aparajithashree919/burnoutless
 cd burnoutless
 pip install -r requirements.txt
 
