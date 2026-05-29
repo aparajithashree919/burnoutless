@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+radon
+gitpython
+requests

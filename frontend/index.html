@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BurnoutLess — AI Tech Debt Triage</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a; --border: #2e3248;
+    --text: #e2e4f0; --muted: #8b90aa; --purple: #7c6ff7; --purple-light: #a89cf8;
+    --teal: #1db87a; --amber: #f0a020; --coral: #e05a3a; --red: #e24b4b; --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.6; }
+  header { border-bottom: 1px solid var(--border); padding: 18px 32px; display: flex; align-items: center; gap: 12px; }
+  .logo { font-size: 22px; font-weight: 700; color: var(--purple-light); letter-spacing: -0.5px; }
+  .tagline { color: var(--muted); font-size: 13px; }
+  .main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+  .input-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 28px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab { padding: 7px 18px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; transition: all 0.15s; }
+  .tab.active { background: var(--purple); border-color: var(--purple); color: #fff; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  input[type=text], textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 11px 14px; font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s; }
+  input[type=text]:focus, textarea:focus { border-color: var(--purple); }
+  textarea { resize: vertical; min-height: 140px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+  label { display: block; margin-bottom: 7px; font-size: 13px; color: var(--muted); }
+  .btn { margin-top: 16px; padding: 11px 28px; background: var(--purple); border: none; border-radius: 8px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+  .btn:hover { opacity: 0.88; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .spinner { display: none; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; margin-top: 16px; }
+  .spinner.active { display: flex; }
+  .dot { width: 8px; height: 8px; background: var(--purple); border-radius: 50%; animation: bounce 1.2s infinite; }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+  #results { display: none; }
+  #results.visible { display: block; }
+  .summary-bar { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .stat-card { flex: 1; min-width: 120px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; }
+  .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-size: 26px; font-weight: 700; }
+  .stat-value.critical { color: var(--red); }
+  .stat-value.high { color: var(--coral); }
+  .stat-value.medium { color: var(--amber); }
+  .stat-value.low { color: var(--teal); }
+  .stat-value.purple { color: var(--purple-light); }
+  .section-title { font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; }
+  .hotspot-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; overflow: hidden; transition: border-color 0.15s; cursor: pointer; }
+  .hotspot-card:hover { border-color: var(--purple); }
+  .hotspot-header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; }
+  .severity-badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0; }
+  .badge-critical { background: rgba(226,75,75,0.15); color: var(--red); }
+  .badge-high { background: rgba(224,90,58,0.15); color: var(--coral); }
+  .badge-medium { background: rgba(240,160,32,0.15); color: var(--amber); }
+  .badge-low { background: rgba(29,184,122,0.15); color: var(--teal); }
+  .hotspot-filename { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; color: var(--purple-light); flex: 1; }
+  .hotspot-complexity { font-size: 12px; color: var(--muted); }
+  .hotspot-body { display: none; padding: 0 20px 20px; border-top: 1px solid var(--border); }
+  .hotspot-body.open { display: block; }
+  .summary-text { color: var(--text); margin: 14px 0 10px; font-size: 14px; }
+  .burnout-pill { background: rgba(226,75,75,0.1); border: 1px solid rgba(226,75,75,0.2); border-radius: 6px; padding: 8px 14px; font-size: 13px; color: #f09595; margin-bottom: 14px; }
+  .fix-plan { list-style: none; }
+  .fix-plan li { display: flex; gap: 10px; padding: 7px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .fix-plan li:last-child { border-bottom: none; }
+  .step-num { width: 20px; height: 20px; background: var(--purple); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .citation { margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .citation span { color: var(--purple-light); }
+  .effort-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-left: auto; }
+  .effort-low { background: rgba(29,184,122,0.12); color: var(--teal); }
+  .effort-medium { background: rgba(240,160,32,0.12); color: var(--amber); }
+  .effort-high { background: rgba(226,75,75,0.12); color: var(--red); }
+  .iq-banner { background: rgba(124,111,247,0.08); border: 1px solid rgba(124,111,247,0.25); border-radius: var(--radius); padding: 14px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
+  .iq-dot { width: 8px; height: 8px; background: var(--teal); border-radius: 50%; flex-shrink: 0; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .error-box { background: rgba(226,75,75,0.08); border: 1px solid rgba(226,75,75,0.2); border-radius: var(--radius); padding: 16px 20px; color: #f09595; font-size: 14px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">BurnoutLess</div>
+    <div class="tagline">AI-powered tech debt triage — find what's burning your team out</div>
+  </div>
+</header>
+<div class="main">
+  <div class="input-card">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('repo')">GitHub repo URL</button>
+      <button class="tab" onclick="switchTab('snippet')">Paste code</button>
+    </div>
+    <div id="tab-repo" class="tab-panel active">
+      <label>Public GitHub repository URL</label>
+      <input type="text" id="repo-url" placeholder="https://github.com/owner/repo" />
+    </div>
+    <div id="tab-snippet" class="tab-panel">
+      <label>Paste your Python code</label>
+      <textarea id="code-input" placeholder="def my_function():&#10;    # paste your code here&#10;    pass"></textarea>
+      <label style="margin-top:12px">Filename (optional)</label>
+      <input type="text" id="filename-input" placeholder="my_module.py" />
+    </div>
+    <button class="btn" id="analyse-btn" onclick="runAnalysis()">Analyse for burnout hotspots</button>
+    <div class="spinner" id="spinner">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <span id="spinner-text">Scanning codebase...</span>
+    </div>
+  </div>
+
+  <div id="results">
+    <div class="iq-banner">
+      <div class="iq-dot"></div>
+      Recommendations grounded by <strong style="color:var(--purple-light);margin:0 4px">Microsoft Foundry IQ</strong> — cited best practices, not hallucinations
+    </div>
+    <div class="summary-bar" id="summary-bar"></div>
+    <div class="section-title">Burnout hotspots — ranked by severity</div>
+    <div id="hotspot-list"></div>
+  </div>
+</div>
+<script>
+let activeTab = 'repo';
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='repo')||(i===1&&tab==='snippet')));
+  document.getElementById('tab-repo').classList.toggle('active', tab==='repo');
+  document.getElementById('tab-snippet').classList.toggle('active', tab==='snippet');
+}
+async function runAnalysis() {
+  const btn = document.getElementById('analyse-btn');
+  const spinner = document.getElementById('spinner');
+  const results = document.getElementById('results');
+  results.classList.remove('visible');
+  btn.disabled = true;
+  spinner.classList.add('active');
+  const steps = ['Cloning repository...','Scanning complexity...','Detecting undocumented code...','Grounding with Foundry IQ...','Ranking burnout hotspots...'];
+  let si = 0;
+  const interval = setInterval(() => { document.getElementById('spinner-text').textContent = steps[si++ % steps.length]; }, 1800);
+  try {
+    let response;
+    if (activeTab === 'repo') {
+      const url = document.getElementById('repo-url').value.trim();
+      if (!url) { alert('Please enter a GitHub repo URL'); return; }
+      response = await fetch('/analyse/repo', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url}) });
+    } else {
+      const code = document.getElementById('code-input').value.trim();
+      const filename = document.getElementById('filename-input').value.trim() || 'snippet.py';
+      if (!code) { alert('Please paste some code'); return; }
+      response = await fetch('/analyse/snippet', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code, filename}) });
+    }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Analysis failed');
+    renderResults(data.results);
+  } catch(e) {
+    document.getElementById('hotspot-list').innerHTML = `<div class="error-box">Error: ${e.message}</div>`;
+    results.classList.add('visible');
+  } finally {
+    clearInterval(interval);
+    btn.disabled = false;
+    spinner.classList.remove('active');
+  }
+}
+function renderResults(results) {
+  const counts = {critical:0,high:0,medium:0,low:0};
+  results.forEach(r => counts[r.severity]=(counts[r.severity]||0)+1);
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Files scanned</div><div class="stat-value purple">${results.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value critical">${counts.critical||0}</div></div>
+    <div class="stat-card"><div class="stat-label">High</div><div class="stat-value high">${counts.high||0}</div></div>
+    <div class="stat-card"><div class="stat-label">Medium</div><div class="stat-value medium">${counts.medium||0}</div></div>
+    <div class="stat-card"><div class="stat-label">Low / healthy</div><div class="stat-value low">${counts.low||0}</div></div>`;
+  document.getElementById('hotspot-list').innerHTML = results.map((r,i) => {
+    const rec = r.recommendation || {};
+    const steps = (rec.fix_plan||[]).map((s,j)=>`<li><div class="step-num">${j+1}</div><span>${s}</span></li>`).join('');
+    const effort = rec.effort||'medium';
+    return `<div class="hotspot-card" onclick="toggleCard(${i})">
+      <div class="hotspot-header">
+        <span class="severity-badge badge-${r.severity}">${r.severity}</span>
+        <span class="hotspot-filename">${r.filename}</span>
+        <span class="effort-tag effort-${effort}">${effort} effort</span>
+        <span class="hotspot-complexity">complexity ${r.complexity} &nbsp;·&nbsp; burnout score ${r.burnout_score}/100</span>
+      </div>
+      <div class="hotspot-body" id="card-${i}">
+        <div class="summary-text">${rec.summary||'No summary available.'}</div>
+        <div class="burnout-pill">Burnout risk: ${rec.burnout_reason||'High cognitive load detected.'}</div>
+        <ul class="fix-plan">${steps}</ul>
+        <div class="citation">Foundry IQ source: <span>${rec.citation||'General best practices'}</span> &nbsp;·&nbsp; Maintainability index: ${r.maintainability} &nbsp;·&nbsp; Undocumented: ${r.undocumented}</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('results').classList.add('visible');
+}
+function toggleCard(i) { document.getElementById('card-'+i).classList.toggle('open'); }
+</script>
+</body>
+</html>
