@@ -66,4 +66,4 @@ Then open http://localhost:8000 in your browser.
 
 ## Team
 
-Solo submission — built in 1 day for Agents League Hackathon 2026.
+Solo submission — built for Agents League Hackathon 2026.
